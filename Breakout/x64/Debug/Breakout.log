@@ -1,0 +1,7 @@
+﻿  Breakout.cpp
+C:\Users\Slava\Downloads\github\Breakout\Breakout\Breakout.cpp(51,41): warning C4244: '=': conversion from 'int' to 'float', possible loss of data
+C:\Users\Slava\Downloads\github\Breakout\Breakout\Breakout.cpp(52,42): warning C4244: '=': conversion from 'int' to 'float', possible loss of data
+C:\Users\Slava\Downloads\github\Breakout\Breakout\Breakout.cpp(60,10): warning C4244: 'argument': conversion from 'float' to 'int', possible loss of data
+C:\Users\Slava\Downloads\github\Breakout\Breakout\Breakout.cpp(59,22): warning C4244: 'argument': conversion from 'float' to 'int', possible loss of data
+C:\Users\Slava\Downloads\github\Breakout\Breakout\Breakout.cpp(121,20): warning C4305: 'argument': truncation from 'const double' to 'float'
+  Breakout.vcxproj -> C:\Users\Slava\Downloads\github\Breakout\x64\Debug\Breakout.exe
