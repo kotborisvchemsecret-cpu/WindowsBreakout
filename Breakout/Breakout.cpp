@@ -24,6 +24,7 @@ ATOM                MyRegisterClass(HINSTANCE hInstance);
 LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 void UpdateGame(float dt);
 void UpdateBall(float dt);
+void UpdatePaddle();
 void RemoveDestroyedBricks();
 void HandleCollisions();
 bool CheckCollision(const Ball& ball, const Brick& brick);
@@ -74,7 +75,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
         0,
         CLASS_NAME,
         L"Paddle",
-        WS_POPUP,
+        WS_OVERLAPPEDWINDOW,
         (int)paddle.x,
         (int)paddle.y,
         paddle.width,
@@ -156,6 +157,20 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
     switch (message)
     {
+    case WM_MOVING:
+    {
+        RECT* rc = (RECT*)lParam;
+
+        if (hWnd == paddle.hwnd)
+        {
+            int height = rc->bottom - rc->top;
+
+            rc->top = 700;
+            rc->bottom = rc->top + height;
+        }
+
+        return TRUE;
+    }
     case WM_PAINT:
     {
         PAINTSTRUCT ps;
@@ -180,6 +195,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 void UpdateGame(float dt)
 {
+	UpdatePaddle();
     UpdateBall(dt);
 
     HandleCollisions();
@@ -225,4 +241,13 @@ bool CheckCollision(const Ball& ball, const Brick& brick)
             ((ball.x + ball.radius) > brick.x) &&
             (ball.y < (brick.y + brick.height)) &&
             ((ball.y + ball.radius) > brick.y));
+}
+
+void UpdatePaddle()
+{
+    // Get the current mouse position
+    RECT rc;
+    GetWindowRect(paddle.hwnd, &rc);
+    paddle.x = (float)rc.left; // Center of the paddle
+    paddle.y = (float)rc.top;
 }
