@@ -134,6 +134,7 @@
     <ClInclude Include="Paddle.h" />
     <ClInclude Include="Resource.h" />
     <ClInclude Include="targetver.h" />
+    <ClInclude Include="WinObject.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Breakout.cpp" />

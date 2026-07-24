@@ -1,13 +1,16 @@
 #pragma once
-#include <Windows.h>
+#include "WinObject.h"
 
-struct Paddle
+struct Paddle : WinObject
 {
-    HWND hwnd = nullptr;
+    float x = 400;      
+    float y = 700;      
 
-    float x = 400;
-    float y = 700;
+    int width = 200;    
+    int height = 25;
+    float previousX = 0;
+    float previousY = 0;
 
-    int width = 200;
-    int height = 20;
+    float vx = 0;
+    float vy = 0;
 };

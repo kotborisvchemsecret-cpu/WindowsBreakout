@@ -6,28 +6,33 @@
 #include "Brick.h"
 #include "Ball.h"
 #include "Paddle.h"
+#include "WinObject.h"
 #include <vector>
+#include <algorithm>
 
 // Global Variables:
+bool draggingPaddle = false; // Flag to indicate if the paddle is being dragged
 std::vector<Brick> bricks; // Vector to hold all the bricks
 Ball ball;
 Paddle paddle;
-HINSTANCE hInst;                                // current instance
+HINSTANCE hInst;  // current instance
 const wchar_t CLASS_NAME[] = L"BrickWindow";
 const wchar_t WINDOW_TITLE[] = L"Breakout";
 
 const int rows = 5;
 const int cols = 10;
+const float maxSpeed = 800.0f; // Maximum speed for the ball
 
 // Forward declarations of functions included in this code module:
 ATOM                MyRegisterClass(HINSTANCE hInstance);
 LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 void UpdateGame(float dt);
 void UpdateBall(float dt);
-void UpdatePaddle();
+void UpdatePaddle(float dt);
 void RemoveDestroyedBricks();
 void HandleCollisions();
-bool CheckCollision(const Ball& ball, const Brick& brick);
+void HandlePaddleCollision();
+bool CheckCollision(const Ball& ball, const WinObject& win);
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
                      _In_opt_ HINSTANCE hPrevInstance,
@@ -37,12 +42,28 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     UNREFERENCED_PARAMETER(hPrevInstance);
     UNREFERENCED_PARAMETER(lpCmdLine);
 
-    // TODO: Place code here.
-
     // Initialize global strings
 	hInst = hInstance; // Store instance handle in our global variable
     MyRegisterClass(hInstance);
+    DWORD style =
+        WS_OVERLAPPED |
+        WS_CAPTION |
+        WS_SYSMENU;
+    paddle.hwnd = CreateWindowEx(
+        0,
+        CLASS_NAME,
+        L"Paddle",
+        style,
+        (int)paddle.x,
+        (int)paddle.y,
+        paddle.width,
+        paddle.height,
+        nullptr,
+        nullptr,
+        hInst,
+        nullptr);
 
+    ShowWindow(paddle.hwnd, SW_SHOW);
 
     for (int row = 0; row < rows; ++row)
     {
@@ -61,7 +82,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 				brick.y,
 				brick.width,
 				brick.height,
-                nullptr,
+                paddle.hwnd,
 				nullptr,
                 hInst,
 				nullptr);
@@ -71,21 +92,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
             bricks.push_back(brick);
         }
 	}
-    paddle.hwnd = CreateWindowEx(
-        0,
-        CLASS_NAME,
-        L"Paddle",
-        WS_OVERLAPPEDWINDOW,
-        (int)paddle.x,
-        (int)paddle.y,
-        paddle.width,
-        paddle.height,
-        nullptr,
-        nullptr,
-        hInst,
-        nullptr);
 
-    ShowWindow(paddle.hwnd, SW_SHOW);
 
     ball.hwnd = CreateWindowEx(
         0,
@@ -120,6 +127,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
         }
 
         UpdateGame(dt);
+        Sleep(16);
     }
 }
 
@@ -157,6 +165,37 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
     switch (message)
     {
+    case WM_SYSCOMMAND:
+    {
+        if ((wParam & 0xFFF0) == SC_MINIMIZE)
+        {
+            OutputDebugStringW(L"SC_MINIMIZE\n");
+        }
+
+        return DefWindowProc(hWnd, message, wParam, lParam);
+    }
+
+    case WM_SIZE:
+    {
+        if (wParam == SIZE_MINIMIZED)
+        {
+            OutputDebugStringW(L"SIZE_MINIMIZED\n");
+        }
+
+        return DefWindowProc(hWnd, message, wParam, lParam);
+    }
+    case WM_ENTERSIZEMOVE:
+        if (hWnd == paddle.hwnd)
+        {
+            draggingPaddle = true;
+        }
+		break;
+    case WM_EXITSIZEMOVE:
+        if (hWnd == paddle.hwnd)
+        {
+            draggingPaddle = false;
+		}
+		break;
     case WM_MOVING:
     {
         RECT* rc = (RECT*)lParam;
@@ -185,8 +224,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     }
     break;
     case WM_DESTROY:
-        PostQuitMessage(0);
-        break;
+        return 0;
     default:
         return DefWindowProc(hWnd, message, wParam, lParam);
     }
@@ -195,9 +233,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 void UpdateGame(float dt)
 {
-	UpdatePaddle();
+	UpdatePaddle(dt);
     UpdateBall(dt);
 
+	HandlePaddleCollision(); // possibly optimize to not check brick after  paddle collision registered
     HandleCollisions();
 
     RemoveDestroyedBricks();
@@ -206,6 +245,10 @@ void UpdateGame(float dt)
 void UpdateBall(float dt)
 {
     // Update the ball's position based on its velocity:
+
+    if (!draggingPaddle) {
+        return;
+    }
     ball.x += ball.vx * dt;
     ball.y += ball.vy * dt;
 
@@ -229,25 +272,46 @@ void HandleCollisions()
         {
             // Handle collision response (e.g., reverse ball direction)
             ball.vy = -ball.vy; // Simple response: reverse vertical velocity
+			DestroyWindow(brick.hwnd); // Destroy the brick's window
             brick.destroyed = true; // Mark the brick as destroyed
         }
     }
 }
-
-bool CheckCollision(const Ball& ball, const Brick& brick)
+void HandlePaddleCollision()
 {
-    // Simple AABB collision detection
-    return ((ball.x < (brick.x + brick.width)) &&
-            ((ball.x + ball.radius) > brick.x) &&
-            (ball.y < (brick.y + brick.height)) &&
-            ((ball.y + ball.radius) > brick.y));
+    // Check for collision between the ball and the paddle
+    if (ball.vy > 0 && CheckCollision(ball, paddle))
+    {
+        ball.y = paddle.y - ball.radius * 2;
+        ball.vy = -std::abs(ball.vy);   // Bounce upward
+        ball.vx += paddle.vx * 0.3f;    // Add spin from paddle movement
+        ball.vx = std::clamp(ball.vx, -maxSpeed, maxSpeed);
+    }
 }
 
-void UpdatePaddle()
+bool CheckCollision(const Ball& ball, const WinObject& win)
 {
-    // Get the current mouse position
+    // Simple AABB collision detection
+    return ((ball.x < (win.x + win.width)) &&
+            ((ball.x + ball.radius * 2) > win.x) &&
+            (ball.y < (win.y + win.height)) &&
+            ((ball.y + ball.radius * 2) > win.y));
+}
+
+void UpdatePaddle(float dt)
+{
     RECT rc;
     GetWindowRect(paddle.hwnd, &rc);
-    paddle.x = (float)rc.left; // Center of the paddle
-    paddle.y = (float)rc.top;
+
+    float newX = (float)rc.left;
+    float newY = (float)rc.top;
+
+    paddle.vx = (newX - paddle.previousX) / dt;
+    paddle.vy = (newY - paddle.previousY) / dt;
+
+    paddle.previousX = newX;
+    paddle.previousY = newY;
+
+    paddle.x = newX;
+    paddle.y = newY;
 }
